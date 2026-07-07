@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "fr-apiaas"
+version = "0.1.0"
+description = "Official Python SDK for FR-APIaaS — Face Recognition as a Service"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+keywords = ["face-recognition", "biometrics", "api", "sdk", "fr-apiaas"]
+dependencies = [
+    "requests>=2.31.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-mock>=3.12",
+    "responses>=0.25",
+    "mypy>=1.9",
+    "types-requests",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["fr_apiaas*"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
