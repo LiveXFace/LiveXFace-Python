@@ -18,6 +18,8 @@ from .types import (
     LivenessResult,
     BatchResponse,
     BatchDeleteResponse,
+    AttributesResult,
+    BatchJob,
 )
 
 DEFAULT_BASE_URL = "http://localhost:8080/api/v1"
@@ -316,3 +318,50 @@ class FacesResource:
             json={"face_ids": face_ids},
         )
         return BatchDeleteResponse.from_dict(resp)
+
+    def attributes(self, collection_id: str, image: ImageInput) -> AttributesResult:
+        """Detect face attributes (age, gender, emotion, glasses, mask, head
+        pose, landmarks) for all faces in an image. No face is enrolled."""
+        fname, fbytes, ftype = _to_bytes_tuple(image)
+        files = {"image": (fname, fbytes, ftype)}
+        resp = self._c._request(
+            "POST", f"/collections/{collection_id}/attributes", files=files
+        )
+        return AttributesResult.from_dict(resp)
+
+    def batch_register_async(
+        self,
+        collection_id: str,
+        items: list[dict[str, Any]],
+    ) -> BatchJob:
+        """
+        Submit up to 100 faces for asynchronous registration. Returns a job
+        immediately; poll :meth:`get_batch_job` until ``status`` is ``done``
+        or ``failed``.
+
+        Each item must have ``image`` (ImageInput) and ``external_id`` (str).
+        Optional ``metadata`` dict is also supported.
+        """
+        files: dict[str, Any] = {}
+        entries = []
+        for i, item in enumerate(items):
+            fname, fbytes, ftype = _to_bytes_tuple(item["image"])
+            files[f"images[{i}]"] = (fname, fbytes, ftype)
+            entries.append({
+                "external_id": item["external_id"],
+                "metadata": item.get("metadata", {}),
+            })
+        resp = self._c._request(
+            "POST",
+            f"/collections/{collection_id}/faces/batch-async",
+            files=files,
+            data={"entries": json.dumps(entries)},
+        )
+        return BatchJob.from_dict(resp)
+
+    def get_batch_job(self, collection_id: str, job_id: str) -> BatchJob:
+        """Fetch the status (and per-image results) of an async batch job."""
+        resp = self._c._request(
+            "GET", f"/collections/{collection_id}/batch/{job_id}"
+        )
+        return BatchJob.from_dict(resp)

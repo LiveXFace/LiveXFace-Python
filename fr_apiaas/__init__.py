@@ -11,6 +11,10 @@ from .types import (
     LivenessResult,
     BatchResponse,
     BatchDeleteResponse,
+    FaceAttributes,
+    AttributesResult,
+    BatchJobResult,
+    BatchJob,
 )
 
 __version__ = "0.1.0"
@@ -26,4 +30,8 @@ __all__ = [
     "LivenessResult",
     "BatchResponse",
     "BatchDeleteResponse",
+    "FaceAttributes",
+    "AttributesResult",
+    "BatchJobResult",
+    "BatchJob",
 ]
