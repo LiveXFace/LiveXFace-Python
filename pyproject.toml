@@ -3,13 +3,13 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.backends.legacy:build"
 
 [project]
-name = "fr-apiaas"
+name = "serupa"
 version = "0.1.0"
-description = "Official Python SDK for FR-APIaaS — Face Recognition as a Service"
+description = "Official Python SDK for Serupa — Face Recognition as a Service"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
-keywords = ["face-recognition", "biometrics", "api", "sdk", "fr-apiaas"]
+keywords = ["face-recognition", "biometrics", "api", "sdk", "serupa"]
 dependencies = [
     "requests>=2.31.0",
 ]
@@ -25,7 +25,7 @@ dev = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["fr_apiaas*"]
+include = ["serupa*"]
 
 [tool.mypy]
 python_version = "3.10"

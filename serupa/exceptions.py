@@ -1,5 +1,5 @@
-class FRApiError(Exception):
-    """Raised when the FR-APIaaS server returns an error response."""
+class SerupaApiError(Exception):
+    """Raised when the Serupa server returns an error response."""
 
     def __init__(self, code: str, message: str, status_code: int, request_id: str | None = None) -> None:
         super().__init__(message)
@@ -8,10 +8,10 @@ class FRApiError(Exception):
         self.request_id = request_id
 
     def __repr__(self) -> str:
-        return f"FRApiError(code={self.code!r}, status_code={self.status_code}, message={str(self)!r})"
+        return f"SerupaApiError(code={self.code!r}, status_code={self.status_code}, message={str(self)!r})"
 
 
-class FRNetworkError(Exception):
+class SerupaNetworkError(Exception):
     """Raised when a network-level error occurs (timeout, connection refused, etc.)."""
 
     def __init__(self, message: str, cause: BaseException | None = None) -> None:
@@ -19,4 +19,4 @@ class FRNetworkError(Exception):
         self.cause = cause
 
     def __repr__(self) -> str:
-        return f"FRNetworkError(message={str(self)!r})"
+        return f"SerupaNetworkError(message={str(self)!r})"

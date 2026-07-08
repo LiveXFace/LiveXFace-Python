@@ -1,7 +1,7 @@
-"""FR-APIaaS Python SDK — Face Recognition as a Service."""
+"""Serupa Python SDK — Face Recognition as a Service."""
 
-from .client import FRClient
-from .exceptions import FRApiError, FRNetworkError
+from .client import Serupa
+from .exceptions import SerupaApiError, SerupaNetworkError
 from .types import (
     FaceCollection,
     Face,
@@ -19,9 +19,9 @@ from .types import (
 
 __version__ = "0.1.0"
 __all__ = [
-    "FRClient",
-    "FRApiError",
-    "FRNetworkError",
+    "Serupa",
+    "SerupaApiError",
+    "SerupaNetworkError",
     "FaceCollection",
     "Face",
     "VerifyResult",

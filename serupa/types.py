@@ -1,4 +1,4 @@
-"""Typed dataclasses for FR-APIaaS API responses."""
+"""Typed dataclasses for Serupa API responses."""
 
 from __future__ import annotations
 

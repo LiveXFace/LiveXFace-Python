@@ -1,4 +1,4 @@
-"""Main client for the FR-APIaaS Python SDK."""
+"""Main client for the Serupa Python SDK."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from typing import Any, IO, Union
 import requests
 from requests import Response
 
-from .exceptions import FRApiError, FRNetworkError
+from .exceptions import SerupaApiError, SerupaNetworkError
 from .types import (
     FaceCollection,
     Face,
@@ -41,17 +41,17 @@ def _to_bytes_tuple(src: ImageInput, filename: str = "image.jpg") -> tuple[str, 
     return filename, src.read(), "image/jpeg"
 
 
-class FRClient:
+class Serupa:
     """
-    Main client for the FR-APIaaS recognition API.
+    Main client for the Serupa recognition API.
 
     All face operations use API key authentication scoped to a specific collection.
 
     Example::
 
-        from fr_apiaas import FRClient
+        from serupa import Serupa
 
-        client = FRClient(api_key="fr_live_xxxx")
+        client = Serupa(api_key="srp_live_xxxx")
 
         result = client.faces.identify(
             collection_id="...",
@@ -84,18 +84,18 @@ class FRClient:
                 method, url, timeout=self.timeout, **kwargs
             )
         except requests.exceptions.Timeout as exc:
-            raise FRNetworkError(f"Request timed out after {self.timeout}s", exc) from exc
+            raise SerupaNetworkError(f"Request timed out after {self.timeout}s", exc) from exc
         except requests.exceptions.ConnectionError as exc:
-            raise FRNetworkError(f"Connection failed: {exc}", exc) from exc
+            raise SerupaNetworkError(f"Connection failed: {exc}", exc) from exc
 
         try:
             parsed: dict[str, Any] = resp.json()
         except ValueError as exc:
-            raise FRApiError("PARSE_ERROR", "Failed to parse response body", resp.status_code) from exc
+            raise SerupaApiError("PARSE_ERROR", "Failed to parse response body", resp.status_code) from exc
 
         if not parsed.get("success") or not resp.ok:
             err = parsed.get("error") or {}
-            raise FRApiError(
+            raise SerupaApiError(
                 code=err.get("code", "UNKNOWN_ERROR"),
                 message=err.get("message", "An unknown error occurred"),
                 status_code=resp.status_code,
@@ -108,7 +108,7 @@ class FRClient:
 class CollectionsResource:
     """Operations on face collections."""
 
-    def __init__(self, client: FRClient) -> None:
+    def __init__(self, client: Serupa) -> None:
         self._c = client
 
     def list(self) -> list[FaceCollection]:
@@ -146,7 +146,7 @@ class CollectionsResource:
 class FacesResource:
     """Face enrollment and recognition operations."""
 
-    def __init__(self, client: FRClient) -> None:
+    def __init__(self, client: Serupa) -> None:
         self._c = client
 
     def register(

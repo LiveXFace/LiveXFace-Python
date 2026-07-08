@@ -1,20 +1,20 @@
-# fr-apiaas
+# serupa
 
-Official Python SDK for [FR-APIaaS](https://github.com/imronreviady/fr-apiaas) — Face Recognition as a Service.
+Official Python SDK for [Serupa](https://github.com/serupa/serupa-python) — Face Recognition as a Service.
 
 ## Installation
 
 ```bash
-pip install fr-apiaas
+pip install serupa
 ```
 
 ## Quick Start
 
 ```python
-from fr_apiaas import FRClient
+from serupa import Serupa
 
-client = FRClient(
-    api_key="fr_live_xxxxxxxxxxxx",
+client = Serupa(
+    api_key="srp_live_xxxxxxxxxxxx",
     base_url="https://your-instance/api/v1",  # optional
 )
 
@@ -86,13 +86,13 @@ result = client.faces.batch_delete("collection-uuid", ["face-id-1", "face-id-2"]
 ## Error Handling
 
 ```python
-from fr_apiaas import FRApiError, FRNetworkError
+from serupa import SerupaApiError, SerupaNetworkError
 
 try:
     result = client.faces.identify(collection_id="col-id", image=image_bytes)
-except FRApiError as e:
+except SerupaApiError as e:
     print(f"API error [{e.code}] {e.status_code}: {e}")
-except FRNetworkError as e:
+except SerupaNetworkError as e:
     print(f"Network error: {e}")
 ```
 
@@ -107,6 +107,6 @@ The SDK accepts images as:
 
 | Parameter  | Default                        | Description                      |
 | ---------- | ------------------------------ | -------------------------------- |
-| `api_key`  | **required**                   | Your API key (`fr_live_xxx`)     |
-| `base_url` | `http://localhost:8080/api/v1` | Base URL of the FR-APIaaS server |
+| `api_key`  | **required**                   | Your API key (`srp_live_xxx`)     |
+| `base_url` | `http://localhost:8080/api/v1` | Base URL of the Serupa server |
 | `timeout`  | `30`                           | Request timeout in seconds       |
