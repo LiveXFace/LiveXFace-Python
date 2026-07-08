@@ -1,20 +1,20 @@
-# serupa
+# idemity
 
-Official Python SDK for [Serupa](https://github.com/serupa/serupa-python) — Face Recognition as a Service.
+Official Python SDK for [Idemity](https://github.com/idemity/idemity-python) — Face Recognition as a Service.
 
 ## Installation
 
 ```bash
-pip install serupa
+pip install idemity
 ```
 
 ## Quick Start
 
 ```python
-from serupa import Serupa
+from idemity import Idemity
 
-client = Serupa(
-    api_key="srp_live_xxxxxxxxxxxx",
+client = Idemity(
+    api_key="idm_live_xxxxxxxxxxxx",
     base_url="https://your-instance/api/v1",  # optional
 )
 
@@ -86,13 +86,13 @@ result = client.faces.batch_delete("collection-uuid", ["face-id-1", "face-id-2"]
 ## Error Handling
 
 ```python
-from serupa import SerupaApiError, SerupaNetworkError
+from idemity import IdemityApiError, IdemityNetworkError
 
 try:
     result = client.faces.identify(collection_id="col-id", image=image_bytes)
-except SerupaApiError as e:
+except IdemityApiError as e:
     print(f"API error [{e.code}] {e.status_code}: {e}")
-except SerupaNetworkError as e:
+except IdemityNetworkError as e:
     print(f"Network error: {e}")
 ```
 
@@ -107,6 +107,6 @@ The SDK accepts images as:
 
 | Parameter  | Default                        | Description                      |
 | ---------- | ------------------------------ | -------------------------------- |
-| `api_key`  | **required**                   | Your API key (`srp_live_xxx`)     |
-| `base_url` | `http://localhost:8080/api/v1` | Base URL of the Serupa server |
+| `api_key`  | **required**                   | Your API key (`idm_live_xxx`)     |
+| `base_url` | `http://localhost:8080/api/v1` | Base URL of the Idemity server |
 | `timeout`  | `30`                           | Request timeout in seconds       |

@@ -1,7 +1,7 @@
-"""Serupa Python SDK — Face Recognition as a Service."""
+"""Idemity Python SDK — Face Recognition as a Service."""
 
-from .client import Serupa
-from .exceptions import SerupaApiError, SerupaNetworkError
+from .client import Idemity
+from .exceptions import IdemityApiError, IdemityNetworkError
 from .types import (
     FaceCollection,
     Face,
@@ -19,9 +19,9 @@ from .types import (
 
 __version__ = "0.1.0"
 __all__ = [
-    "Serupa",
-    "SerupaApiError",
-    "SerupaNetworkError",
+    "Idemity",
+    "IdemityApiError",
+    "IdemityNetworkError",
     "FaceCollection",
     "Face",
     "VerifyResult",

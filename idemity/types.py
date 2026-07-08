@@ -1,4 +1,4 @@
-"""Typed dataclasses for Serupa API responses."""
+"""Typed dataclasses for Idemity API responses."""
 
 from __future__ import annotations
 

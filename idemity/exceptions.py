@@ -1,5 +1,5 @@
-class SerupaApiError(Exception):
-    """Raised when the Serupa server returns an error response."""
+class IdemityApiError(Exception):
+    """Raised when the Idemity server returns an error response."""
 
     def __init__(self, code: str, message: str, status_code: int, request_id: str | None = None) -> None:
         super().__init__(message)
@@ -8,10 +8,10 @@ class SerupaApiError(Exception):
         self.request_id = request_id
 
     def __repr__(self) -> str:
-        return f"SerupaApiError(code={self.code!r}, status_code={self.status_code}, message={str(self)!r})"
+        return f"IdemityApiError(code={self.code!r}, status_code={self.status_code}, message={str(self)!r})"
 
 
-class SerupaNetworkError(Exception):
+class IdemityNetworkError(Exception):
     """Raised when a network-level error occurs (timeout, connection refused, etc.)."""
 
     def __init__(self, message: str, cause: BaseException | None = None) -> None:
@@ -19,4 +19,4 @@ class SerupaNetworkError(Exception):
         self.cause = cause
 
     def __repr__(self) -> str:
-        return f"SerupaNetworkError(message={str(self)!r})"
+        return f"IdemityNetworkError(message={str(self)!r})"

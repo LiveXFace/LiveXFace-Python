@@ -3,13 +3,13 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.backends.legacy:build"
 
 [project]
-name = "serupa"
+name = "idemity"
 version = "0.1.0"
-description = "Official Python SDK for Serupa — Face Recognition as a Service"
+description = "Official Python SDK for Idemity — Face Recognition as a Service"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
-keywords = ["face-recognition", "biometrics", "api", "sdk", "serupa"]
+keywords = ["face-recognition", "biometrics", "api", "sdk", "idemity"]
 dependencies = [
     "requests>=2.31.0",
 ]
@@ -25,7 +25,7 @@ dev = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["serupa*"]
+include = ["idemity*"]
 
 [tool.mypy]
 python_version = "3.10"
