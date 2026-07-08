@@ -1,6 +1,6 @@
 [build-system]
 requires = ["setuptools>=68", "wheel"]
-build-backend = "setuptools.backends.legacy:build"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "idemity"
@@ -13,6 +13,11 @@ keywords = ["face-recognition", "biometrics", "api", "sdk", "idemity"]
 dependencies = [
     "requests>=2.31.0",
 ]
+
+[project.urls]
+Homepage = "https://idemity.com"
+Repository = "https://github.com/idemity/idemity-python"
+Issues = "https://github.com/idemity/idemity-python/issues"
 
 [project.optional-dependencies]
 dev = [
