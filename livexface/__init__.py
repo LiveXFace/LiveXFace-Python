@@ -1,7 +1,7 @@
-"""Idemity Python SDK — Face Recognition as a Service."""
+"""LiveXFace Python SDK — Face Recognition as a Service."""
 
-from .client import Idemity
-from .exceptions import IdemityApiError, IdemityNetworkError
+from .client import LiveXFace
+from .exceptions import LiveXFaceApiError, LiveXFaceNetworkError
 from .types import (
     FaceCollection,
     Face,
@@ -19,9 +19,9 @@ from .types import (
 
 __version__ = "0.1.0"
 __all__ = [
-    "Idemity",
-    "IdemityApiError",
-    "IdemityNetworkError",
+    "LiveXFace",
+    "LiveXFaceApiError",
+    "LiveXFaceNetworkError",
     "FaceCollection",
     "Face",
     "VerifyResult",

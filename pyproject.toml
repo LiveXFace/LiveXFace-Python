@@ -3,21 +3,21 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "idemity"
+name = "livexface"
 version = "0.1.0"
-description = "Official Python SDK for Idemity — Face Recognition as a Service"
+description = "Official Python SDK for LiveXFace — Face Recognition as a Service"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
-keywords = ["face-recognition", "biometrics", "api", "sdk", "idemity"]
+keywords = ["face-recognition", "biometrics", "api", "sdk", "livexface"]
 dependencies = [
     "requests>=2.31.0",
 ]
 
 [project.urls]
-Homepage = "https://idemity.com"
-Repository = "https://github.com/idemity/idemity-python"
-Issues = "https://github.com/idemity/idemity-python/issues"
+Homepage = "https://livexface.com"
+Repository = "https://github.com/livexface/livexface-python"
+Issues = "https://github.com/livexface/livexface-python/issues"
 
 [project.optional-dependencies]
 dev = [
@@ -30,7 +30,7 @@ dev = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["idemity*"]
+include = ["livexface*"]
 
 [tool.mypy]
 python_version = "3.10"

@@ -1,4 +1,4 @@
-"""Typed dataclasses for Idemity API responses."""
+"""Typed dataclasses for LiveXFace API responses."""
 
 from __future__ import annotations
 
@@ -20,11 +20,11 @@ class FaceCollection:
     def from_dict(cls, d: dict[str, Any]) -> "FaceCollection":
         return cls(
             id=d["id"],
-            organization_id=d["organization_id"],
+            organization_id=d["organizationId"],
             name=d["name"],
-            face_count=d.get("face_count", 0),
-            created_at=d["created_at"],
-            updated_at=d["updated_at"],
+            face_count=d.get("faceCount", 0),
+            created_at=d["createdAt"],
+            updated_at=d["updatedAt"],
             description=d.get("description", ""),
         )
 
@@ -43,12 +43,12 @@ class Face:
     def from_dict(cls, d: dict[str, Any]) -> "Face":
         return cls(
             id=d["id"],
-            collection_id=d["collection_id"],
-            external_id=d.get("external_id", ""),
+            collection_id=d["collectionId"],
+            external_id=d.get("externalId", ""),
             metadata=d.get("metadata", {}),
-            image_url=d.get("image_url", ""),
-            created_at=d["created_at"],
-            updated_at=d.get("updated_at", d["created_at"]),
+            image_url=d.get("imageUrl", ""),
+            created_at=d["createdAt"],
+            updated_at=d.get("updatedAt", d["createdAt"]),
         )
 
 
@@ -64,21 +64,33 @@ class VerifyResult:
         return cls(
             match=d["match"],
             confidence=d["confidence"],
-            threshold_used=d["threshold_used"],
-            face_id=d.get("face_id"),
+            threshold_used=d["thresholdUsed"],
+            face_id=d.get("faceId"),
         )
 
 
 @dataclass
 class FaceMatch:
-    face: Face
-    similarity: float
+    """One result from an identify call.
+
+    The API returns a flat match — id, external id and confidence — not a
+    nested face object. This class used to read d["face"] and d["similarity"],
+    neither of which the endpoint has ever sent, so every identify call raised
+    KeyError.
+    """
+
+    face_id: str
+    external_id: str
+    confidence: float
+    metadata: dict[str, Any] | None = None
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "FaceMatch":
         return cls(
-            face=Face.from_dict(d["face"]),
-            similarity=d["similarity"],
+            face_id=d.get("faceId", ""),
+            external_id=d.get("externalId", ""),
+            confidence=float(d.get("confidence", 0.0)),
+            metadata=d.get("metadata"),
         )
 
 
@@ -91,22 +103,31 @@ class IdentifyResult:
     def from_dict(cls, d: dict[str, Any]) -> "IdentifyResult":
         return cls(
             matches=[FaceMatch.from_dict(m) for m in d.get("matches", [])],
-            query_time_ms=d.get("query_time_ms", 0),
+            query_time_ms=d.get("queryTimeMs", 0),
         )
 
 
 @dataclass
 class LivenessResult:
+    """Result of a passive liveness check.
+
+    Mirrors what the endpoint actually sends. The previous version required a
+    `confidence` and a `spoof_score`, neither of which appears in the response,
+    so every liveness call raised KeyError.
+    """
+
     is_live: bool
-    confidence: float
-    spoof_score: float
+    liveness_score: float
+    face_detected: bool = False
+    face_count: int = 0
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "LivenessResult":
         return cls(
-            is_live=d["is_live"],
-            confidence=d["confidence"],
-            spoof_score=d.get("spoof_score", 0.0),
+            is_live=bool(d.get("isLive", False)),
+            liveness_score=float(d.get("livenessScore", 0.0)),
+            face_detected=bool(d.get("faceDetected", False)),
+            face_count=int(d.get("faceCount", 0)),
         )
 
 
@@ -119,7 +140,7 @@ class BatchFaceResult:
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "BatchFaceResult":
         return cls(
-            external_id=d["external_id"],
+            external_id=d["externalId"],
             face=Face.from_dict(d["face"]) if d.get("face") else None,
             error=d.get("error"),
         )
@@ -147,7 +168,7 @@ class BatchDeleteResult:
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "BatchDeleteResult":
-        return cls(face_id=d["face_id"], error=d.get("error"))
+        return cls(face_id=d["faceId"], error=d.get("error"))
 
 
 @dataclass
@@ -184,11 +205,11 @@ class FaceAttributes:
         return cls(
             age=d.get("age", 0),
             gender=d.get("gender", ""),
-            det_score=d.get("det_score", 0.0),
+            det_score=d.get("detScore", 0.0),
             bbox=d.get("bbox", {}),
-            landmarks_5pt=d.get("landmarks_5pt"),
-            landmarks_106=d.get("landmarks_106"),
-            head_pose=d.get("head_pose"),
+            landmarks_5pt=d.get("landmarks5pt"),
+            landmarks_106=d.get("landmarks106"),
+            head_pose=d.get("headPose"),
             emotion=d.get("emotion"),
             glasses=d.get("glasses"),
             mask=d.get("mask"),
@@ -206,11 +227,11 @@ class AttributesResult:
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "AttributesResult":
         return cls(
-            face_detected=d.get("face_detected", False),
-            face_count=d.get("face_count", 0),
+            face_detected=d.get("faceDetected", False),
+            face_count=d.get("faceCount", 0),
             faces=[FaceAttributes.from_dict(f) for f in d.get("faces", [])],
             primary=FaceAttributes.from_dict(d["primary"]) if d.get("primary") else None,
-            image_size=d.get("image_size"),
+            image_size=d.get("imageSize"),
         )
 
 
@@ -225,8 +246,8 @@ class BatchJobResult:
     def from_dict(cls, d: dict[str, Any]) -> "BatchJobResult":
         return cls(
             index=d.get("index", 0),
-            external_id=d.get("external_id", ""),
-            face_id=d.get("face_id"),
+            external_id=d.get("externalId", ""),
+            face_id=d.get("faceId"),
             error=d.get("error"),
         )
 
@@ -250,13 +271,13 @@ class BatchJob:
     def from_dict(cls, d: dict[str, Any]) -> "BatchJob":
         return cls(
             id=d["id"],
-            collection_id=d.get("collection_id", ""),
+            collection_id=d.get("collectionId", ""),
             status=d.get("status", ""),
             total=d.get("total", 0),
             processed=d.get("processed", 0),
             succeeded=d.get("succeeded", 0),
             failed=d.get("failed", 0),
-            created_at=d.get("created_at", ""),
-            updated_at=d.get("updated_at", ""),
+            created_at=d.get("createdAt", ""),
+            updated_at=d.get("updatedAt", ""),
             results=[BatchJobResult.from_dict(r) for r in d.get("results") or []],
         )

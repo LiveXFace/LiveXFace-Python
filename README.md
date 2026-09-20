@@ -1,27 +1,27 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/brand/logo-white.svg">
-    <img src="docs/brand/logo.svg" alt="Idemity" width="220">
+    <img src="docs/brand/logo.svg" alt="LiveXFace" width="220">
   </picture>
 </p>
 
-# idemity
+# livexface
 
-Official Python SDK for [Idemity](https://github.com/idemity/idemity-python) — Face Recognition as a Service.
+Official Python SDK for [LiveXFace](https://github.com/livexface/livexface-python) — Face Recognition as a Service.
 
 ## Installation
 
 ```bash
-pip install idemity
+pip install livexface
 ```
 
 ## Quick Start
 
 ```python
-from idemity import Idemity
+from livexface import LiveXFace
 
-client = Idemity(
-    api_key="idm_live_xxxxxxxxxxxx",
+client = LiveXFace(
+    api_key="lxf_live_xxxxxxxxxxxx",
     base_url="https://your-instance/api/v1",  # optional
 )
 
@@ -39,7 +39,7 @@ result = client.faces.identify(
     collection_id="collection-uuid",
     image=open("query.jpg", "rb"),
     top_k=3,
-    threshold=0.55,
+    threshold=0.45,
 )
 for match in result.matches:
     print(f"{match.face.external_id}: {match.similarity:.1%}")
@@ -93,13 +93,13 @@ result = client.faces.batch_delete("collection-uuid", ["face-id-1", "face-id-2"]
 ## Error Handling
 
 ```python
-from idemity import IdemityApiError, IdemityNetworkError
+from livexface import LiveXFaceApiError, LiveXFaceNetworkError
 
 try:
     result = client.faces.identify(collection_id="col-id", image=image_bytes)
-except IdemityApiError as e:
+except LiveXFaceApiError as e:
     print(f"API error [{e.code}] {e.status_code}: {e}")
-except IdemityNetworkError as e:
+except LiveXFaceNetworkError as e:
     print(f"Network error: {e}")
 ```
 
@@ -114,6 +114,6 @@ The SDK accepts images as:
 
 | Parameter  | Default                        | Description                      |
 | ---------- | ------------------------------ | -------------------------------- |
-| `api_key`  | **required**                   | Your API key (`idm_live_xxx`)     |
-| `base_url` | `http://localhost:8080/api/v1` | Base URL of the Idemity server |
+| `api_key`  | **required**                   | Your API key (`lxf_live_xxx`)     |
+| `base_url` | `http://localhost:8080/api/v1` | Base URL of the LiveXFace server |
 | `timeout`  | `30`                           | Request timeout in seconds       |

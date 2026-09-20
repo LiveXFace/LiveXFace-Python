@@ -1,4 +1,4 @@
-"""Main client for the Idemity Python SDK."""
+"""Main client for the LiveXFace Python SDK."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from typing import Any, IO, Union
 import requests
 from requests import Response
 
-from .exceptions import IdemityApiError, IdemityNetworkError
+from .exceptions import LiveXFaceApiError, LiveXFaceNetworkError
 from .types import (
     FaceCollection,
     Face,
@@ -41,17 +41,17 @@ def _to_bytes_tuple(src: ImageInput, filename: str = "image.jpg") -> tuple[str, 
     return filename, src.read(), "image/jpeg"
 
 
-class Idemity:
+class LiveXFace:
     """
-    Main client for the Idemity recognition API.
+    Main client for the LiveXFace recognition API.
 
     All face operations use API key authentication scoped to a specific collection.
 
     Example::
 
-        from idemity import Idemity
+        from livexface import LiveXFace
 
-        client = Idemity(api_key="idm_live_xxxx")
+        client = LiveXFace(api_key="lxf_live_xxxx")
 
         result = client.faces.identify(
             collection_id="...",
@@ -84,18 +84,18 @@ class Idemity:
                 method, url, timeout=self.timeout, **kwargs
             )
         except requests.exceptions.Timeout as exc:
-            raise IdemityNetworkError(f"Request timed out after {self.timeout}s", exc) from exc
+            raise LiveXFaceNetworkError(f"Request timed out after {self.timeout}s", exc) from exc
         except requests.exceptions.ConnectionError as exc:
-            raise IdemityNetworkError(f"Connection failed: {exc}", exc) from exc
+            raise LiveXFaceNetworkError(f"Connection failed: {exc}", exc) from exc
 
         try:
             parsed: dict[str, Any] = resp.json()
         except ValueError as exc:
-            raise IdemityApiError("PARSE_ERROR", "Failed to parse response body", resp.status_code) from exc
+            raise LiveXFaceApiError("PARSE_ERROR", "Failed to parse response body", resp.status_code) from exc
 
         if not parsed.get("success") or not resp.ok:
             err = parsed.get("error") or {}
-            raise IdemityApiError(
+            raise LiveXFaceApiError(
                 code=err.get("code", "UNKNOWN_ERROR"),
                 message=err.get("message", "An unknown error occurred"),
                 status_code=resp.status_code,
@@ -108,7 +108,7 @@ class Idemity:
 class CollectionsResource:
     """Operations on face collections."""
 
-    def __init__(self, client: Idemity) -> None:
+    def __init__(self, client: LiveXFace) -> None:
         self._c = client
 
     def list(self) -> list[FaceCollection]:
@@ -146,7 +146,7 @@ class CollectionsResource:
 class FacesResource:
     """Face enrollment and recognition operations."""
 
-    def __init__(self, client: Idemity) -> None:
+    def __init__(self, client: LiveXFace) -> None:
         self._c = client
 
     def register(
@@ -299,7 +299,7 @@ class FacesResource:
             fname, fbytes, ftype = _to_bytes_tuple(item["image"])
             files[f"images[{i}]"] = (fname, fbytes, ftype)
             entries.append({
-                "external_id": item["external_id"],
+                "externalId": item["external_id"],
                 "metadata": item.get("metadata", {}),
             })
         resp = self._c._request(
@@ -315,7 +315,7 @@ class FacesResource:
         resp = self._c._request(
             "DELETE",
             f"/collections/{collection_id}/faces/batch",
-            json={"face_ids": face_ids},
+            json={"faceIds": face_ids},
         )
         return BatchDeleteResponse.from_dict(resp)
 
@@ -348,7 +348,7 @@ class FacesResource:
             fname, fbytes, ftype = _to_bytes_tuple(item["image"])
             files[f"images[{i}]"] = (fname, fbytes, ftype)
             entries.append({
-                "external_id": item["external_id"],
+                "externalId": item["external_id"],
                 "metadata": item.get("metadata", {}),
             })
         resp = self._c._request(
