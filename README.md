@@ -39,10 +39,9 @@ result = client.faces.identify(
     collection_id="collection-uuid",
     image=open("query.jpg", "rb"),
     top_k=3,
-    threshold=0.45,
 )
 for match in result.matches:
-    print(f"{match.face.external_id}: {match.similarity:.1%}")
+    print(f"{match.external_id}: {match.confidence:.1%}")
 
 # Verify (1:1 comparison)
 verify = client.faces.verify(
@@ -50,31 +49,21 @@ verify = client.faces.verify(
     image=open("query.jpg", "rb"),
     face_id=face.id,
 )
-print(f"Match: {verify.match}, Confidence: {verify.confidence:.3f}")
+print(f"Match: {verify.match}, Confidence: {verify.confidence:.3f}, Threshold: {verify.threshold_used}")
 
 # Liveness detection
 liveness = client.faces.liveness(
     collection_id="collection-uuid",
     image=open("query.jpg", "rb"),
 )
-print(f"Live: {liveness.is_live}, Spoof score: {liveness.spoof_score:.3f}")
+print(f"Live: {liveness.is_live}, Score: {liveness.liveness_score:.3f}")
 ```
 
 ## Collections
 
-```python
-# List collections
-collections = client.collections.list()
-
-# Create a collection
-collection = client.collections.create(
-    name="employees",
-    description="Employee face database",
-)
-
-# Delete a collection
-client.collections.delete(collection.id)
-```
+Collections are created and managed in the LiveXFace dashboard, not through
+the API, so the client has no methods for them. Create one there and pass its
+ID to the calls above.
 
 ## Batch Operations
 

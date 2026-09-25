@@ -3,7 +3,6 @@
 from .client import LiveXFace
 from .exceptions import LiveXFaceApiError, LiveXFaceNetworkError
 from .types import (
-    FaceCollection,
     Face,
     VerifyResult,
     FaceMatch,
@@ -22,7 +21,6 @@ __all__ = [
     "LiveXFace",
     "LiveXFaceApiError",
     "LiveXFaceNetworkError",
-    "FaceCollection",
     "Face",
     "VerifyResult",
     "FaceMatch",

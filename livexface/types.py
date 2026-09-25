@@ -7,29 +7,6 @@ from typing import Any
 
 
 @dataclass
-class FaceCollection:
-    id: str
-    organization_id: str
-    name: str
-    face_count: int
-    created_at: str
-    updated_at: str
-    description: str = ""
-
-    @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "FaceCollection":
-        return cls(
-            id=d["id"],
-            organization_id=d["organizationId"],
-            name=d["name"],
-            face_count=d.get("faceCount", 0),
-            created_at=d["createdAt"],
-            updated_at=d["updatedAt"],
-            description=d.get("description", ""),
-        )
-
-
-@dataclass
 class Face:
     id: str
     collection_id: str
