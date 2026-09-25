@@ -11,7 +11,6 @@ from requests import Response
 
 from .exceptions import LiveXFaceApiError, LiveXFaceNetworkError
 from .types import (
-    FaceCollection,
     Face,
     VerifyResult,
     IdentifyResult,
@@ -45,7 +44,9 @@ class LiveXFace:
     """
     Main client for the LiveXFace recognition API.
 
-    All face operations use API key authentication scoped to a specific collection.
+    All face operations use API key authentication scoped to a specific
+    collection. Collections themselves are created and managed in the
+    dashboard; the API has no endpoints for that, so neither does this client.
 
     Example::
 
@@ -59,7 +60,7 @@ class LiveXFace:
             top_k=3,
         )
         for match in result.matches:
-            print(match.face.external_id, match.similarity)
+            print(match.external_id, match.confidence)
     """
 
     def __init__(
@@ -74,7 +75,6 @@ class LiveXFace:
         self._session = requests.Session()
         self._session.headers.update({"X-API-Key": api_key})
 
-        self.collections = CollectionsResource(self)
         self.faces = FacesResource(self)
 
     def _request(self, method: str, endpoint: str, **kwargs: Any) -> Any:
@@ -88,9 +88,20 @@ class LiveXFace:
         except requests.exceptions.ConnectionError as exc:
             raise LiveXFaceNetworkError(f"Connection failed: {exc}", exc) from exc
 
+        # A delete answers 204 with no body. Parsing it used to raise
+        # PARSE_ERROR, so every successful delete looked like a failure.
+        if resp.status_code == 204:
+            return None
+
         try:
             parsed: dict[str, Any] = resp.json()
         except ValueError as exc:
+            # An unknown route answers with a plain-text 404, not the JSON
+            # envelope; report the HTTP status rather than a parse failure.
+            if not resp.ok:
+                raise LiveXFaceApiError(
+                    f"HTTP_{resp.status_code}", f"Request failed with HTTP {resp.status_code}", resp.status_code
+                ) from exc
             raise LiveXFaceApiError("PARSE_ERROR", "Failed to parse response body", resp.status_code) from exc
 
         if not parsed.get("success") or not resp.ok:
@@ -99,48 +110,10 @@ class LiveXFace:
                 code=err.get("code", "UNKNOWN_ERROR"),
                 message=err.get("message", "An unknown error occurred"),
                 status_code=resp.status_code,
-                request_id=parsed.get("request_id"),
+                request_id=parsed.get("requestId"),
             )
 
         return parsed.get("data")
-
-
-class CollectionsResource:
-    """Operations on face collections."""
-
-    def __init__(self, client: LiveXFace) -> None:
-        self._c = client
-
-    def list(self) -> list[FaceCollection]:
-        """List all collections accessible by this API key."""
-        data = self._c._request("GET", "/collections")
-        return [FaceCollection.from_dict(d) for d in (data or [])]
-
-    def get(self, collection_id: str) -> FaceCollection:
-        """Get a single collection by ID."""
-        data = self._c._request("GET", f"/collections/{collection_id}")
-        return FaceCollection.from_dict(data)
-
-    def create(self, name: str, description: str = "") -> FaceCollection:
-        """Create a new face collection."""
-        data = self._c._request(
-            "POST", "/collections", json={"name": name, "description": description}
-        )
-        return FaceCollection.from_dict(data)
-
-    def update(self, collection_id: str, name: str | None = None, description: str | None = None) -> FaceCollection:
-        """Update collection name and/or description."""
-        body: dict[str, str] = {}
-        if name is not None:
-            body["name"] = name
-        if description is not None:
-            body["description"] = description
-        data = self._c._request("PUT", f"/collections/{collection_id}", json=body)
-        return FaceCollection.from_dict(data)
-
-    def delete(self, collection_id: str) -> None:
-        """Delete a collection and all its faces."""
-        self._c._request("DELETE", f"/collections/{collection_id}")
 
 
 class FacesResource:
@@ -187,11 +160,19 @@ class FacesResource:
         return Face.from_dict(resp)
 
     def get_by_external_id(self, collection_id: str, external_id: str) -> Face:
-        """Get a face by external ID."""
+        """Get a face by external ID. Returns the first match.
+
+        This used to call /faces/by-external-id/{id}, a route the API does not
+        have, so it always failed. The list endpoint filters by external ID,
+        and answers with a bare list when it does.
+        """
         resp = self._c._request(
-            "GET", f"/collections/{collection_id}/faces/by-external-id/{external_id}"
+            "GET", f"/collections/{collection_id}/faces", params={"external_id": external_id}
         )
-        return Face.from_dict(resp)
+        items = resp if isinstance(resp, list) else []
+        if not items:
+            raise LiveXFaceApiError("FACE_NOT_FOUND", f'No face found with external_id "{external_id}"', 404)
+        return Face.from_dict(items[0])
 
     def delete(self, collection_id: str, face_id: str) -> None:
         """Delete a face from a collection."""
@@ -201,7 +182,7 @@ class FacesResource:
         self,
         collection_id: str,
         image: ImageInput,
-        face_id: str | None = None,
+        face_id: str,
         threshold: float | None = None,
     ) -> VerifyResult:
         """
@@ -212,9 +193,7 @@ class FacesResource:
         """
         fname, fbytes, ftype = _to_bytes_tuple(image)
         files = {"image": (fname, fbytes, ftype)}
-        data: dict[str, str] = {}
-        if face_id:
-            data["face_id"] = face_id
+        data: dict[str, str] = {"face_id": face_id}
         if threshold is not None:
             data["threshold"] = str(threshold)
         resp = self._c._request(
@@ -228,18 +207,20 @@ class FacesResource:
         image: ImageInput,
         top_k: int = 5,
         threshold: float | None = None,
-        live: bool = False,
     ) -> IdentifyResult:
         """
         1:N Identify — search a collection for the best matching faces.
 
+        Identify does not check liveness; call :meth:`liveness` for that. (A
+        ``live`` flag used to be offered here and documented as running
+        liveness detection. The API ignores it.)
+
         :param top_k: Number of top matches to return (max 100).
         :param threshold: Minimum similarity to include in results.
-        :param live: If True, also run passive liveness detection.
         """
         fname, fbytes, ftype = _to_bytes_tuple(image)
         files = {"image": (fname, fbytes, ftype)}
-        data: dict[str, str] = {"top_k": str(top_k), "live": str(live).lower()}
+        data: dict[str, str] = {"top_k": str(top_k)}
         if threshold is not None:
             data["threshold"] = str(threshold)
         resp = self._c._request(
