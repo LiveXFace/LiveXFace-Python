@@ -59,6 +59,33 @@ liveness = client.faces.liveness(
 print(f"Live: {liveness.is_live}, Score: {liveness.liveness_score:.3f}")
 ```
 
+## Active Liveness and Enrolment
+
+A collection can require a liveness check before a face is enrolled. Run an
+active check over 5 to 50 frames captured in order (the user blinks and turns
+their head), then pass the token it returns when you register. The token is
+single-use, valid for 5 minutes, and bound to the collection.
+
+```python
+frames = [open(f"frame_{i}.jpg", "rb") for i in range(10)]
+check = client.faces.active_liveness("collection-uuid", frames)
+print(f"Live: {check.is_live}, Blink: {check.blink.passed}, Head turn: {check.head_turn.passed}")
+
+if check.liveness_token:
+    face = client.faces.register(
+        collection_id="collection-uuid",
+        image=open("photo.jpg", "rb"),
+        external_id="user_123",
+        liveness_token=check.liveness_token,
+    )
+```
+
+Batch items accept a `liveness_token` key too. Enrolment fails with
+`LIVENESS_TOKEN_REQUIRED` (400) when the collection requires a token and none
+was sent, `LIVENESS_TOKEN_INVALID` (422) when it is expired, used or for
+another collection, and `LIVENESS_FACE_MISMATCH` (422) when the enrolled face
+is not the one that passed the check.
+
 ## Collections
 
 Collections are created and managed in the LiveXFace dashboard, not through

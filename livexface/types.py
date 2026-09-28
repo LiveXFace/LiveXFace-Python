@@ -109,6 +109,64 @@ class LivenessResult:
 
 
 @dataclass
+class LivenessChallenge:
+    """One challenge of an active liveness check (blink, head turn, passive
+    anti-spoof).
+
+    ``passed`` is None when the challenge could not be evaluated. Metric keys
+    beyond ``passed`` and ``available`` vary per challenge and are kept as-is
+    in ``details``.
+    """
+
+    passed: bool | None
+    available: bool
+    details: dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> "LivenessChallenge":
+        passed = d.get("passed")
+        return cls(
+            passed=None if passed is None else bool(passed),
+            available=bool(d.get("available", False)),
+            details={k: v for k, v in d.items() if k not in ("passed", "available")},
+        )
+
+
+@dataclass
+class ActiveLivenessResult:
+    """Result of an active (multi-frame) liveness check.
+
+    ``liveness_token`` and ``liveness_token_expires_at`` (RFC 3339) are set only
+    when the check passed.
+    """
+
+    is_live: bool
+    overall_score: float
+    frames_analyzed: int
+    frames_with_face: int
+    blink: LivenessChallenge
+    head_turn: LivenessChallenge
+    passive_antispoof: LivenessChallenge
+    liveness_token: str | None = None
+    liveness_token_expires_at: str | None = None
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> "ActiveLivenessResult":
+        ch = d.get("challenges") or {}
+        return cls(
+            is_live=bool(d.get("isLive", False)),
+            overall_score=float(d.get("overallScore", 0.0)),
+            frames_analyzed=int(d.get("framesAnalyzed", 0)),
+            frames_with_face=int(d.get("framesWithFace", 0)),
+            blink=LivenessChallenge.from_dict(ch.get("blink") or {}),
+            head_turn=LivenessChallenge.from_dict(ch.get("headTurn") or {}),
+            passive_antispoof=LivenessChallenge.from_dict(ch.get("passiveAntispoof") or {}),
+            liveness_token=d.get("livenessToken") or None,
+            liveness_token_expires_at=d.get("livenessTokenExpiresAt") or None,
+        )
+
+
+@dataclass
 class BatchFaceResult:
     external_id: str
     face: Face | None = None

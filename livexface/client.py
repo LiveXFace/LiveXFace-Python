@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, IO, Union
+from typing import Any, IO, Sequence, Union
 
 import requests
 from requests import Response
@@ -15,6 +15,7 @@ from .types import (
     VerifyResult,
     IdentifyResult,
     LivenessResult,
+    ActiveLivenessResult,
     BatchResponse,
     BatchDeleteResponse,
     AttributesResult,
@@ -128,13 +129,21 @@ class FacesResource:
         image: ImageInput,
         external_id: str,
         metadata: dict[str, Any] | None = None,
+        liveness_token: str | None = None,
     ) -> Face:
-        """Register a face in a collection."""
+        """Register a face in a collection.
+
+        :param liveness_token: Token from a passed :meth:`active_liveness`
+            check. Required when the collection requires liveness on enrolment;
+            single-use, valid for 5 minutes, and bound to the collection.
+        """
         fname, fbytes, ftype = _to_bytes_tuple(image)
         files = {"image": (fname, fbytes, ftype)}
         data: dict[str, str] = {"external_id": external_id}
         if metadata:
             data["metadata"] = json.dumps(metadata)
+        if liveness_token:
+            data["liveness_token"] = liveness_token
         resp = self._c._request("POST", f"/collections/{collection_id}/faces", files=files, data=data)
         return Face.from_dict(resp)
 
@@ -237,6 +246,28 @@ class FacesResource:
         )
         return LivenessResult.from_dict(resp)
 
+    def active_liveness(
+        self,
+        collection_id: str,
+        frames: Sequence[ImageInput],
+    ) -> ActiveLivenessResult:
+        """
+        Active liveness — check a sequence of frames for a blink, a head turn
+        and passive anti-spoofing.
+
+        Send 5 to 50 frames (JPEG/PNG) captured in order. When the check
+        passes, the result carries a ``liveness_token`` to pass to
+        :meth:`register` or a batch entry: single-use, valid for 5 minutes,
+        and bound to this collection.
+        """
+        files: dict[str, Any] = {}
+        for i, frame in enumerate(frames):
+            files[f"frame_{i}"] = _to_bytes_tuple(frame, f"frame_{i}.jpg")
+        resp = self._c._request(
+            "POST", f"/collections/{collection_id}/active-liveness", files=files
+        )
+        return ActiveLivenessResult.from_dict(resp)
+
     def compare(
         self,
         image1: ImageInput,
@@ -265,7 +296,8 @@ class FacesResource:
         Batch register up to 20 faces in a single request.
 
         Each item must have ``image`` (ImageInput) and ``external_id`` (str).
-        Optional ``metadata`` dict is also supported.
+        Optional ``metadata`` dict and ``liveness_token`` (str, from
+        :meth:`active_liveness`) are also supported.
 
         Example::
 
@@ -279,10 +311,13 @@ class FacesResource:
         for i, item in enumerate(items):
             fname, fbytes, ftype = _to_bytes_tuple(item["image"])
             files[f"images[{i}]"] = (fname, fbytes, ftype)
-            entries.append({
+            entry: dict[str, Any] = {
                 "externalId": item["external_id"],
                 "metadata": item.get("metadata", {}),
-            })
+            }
+            if item.get("liveness_token"):
+                entry["livenessToken"] = item["liveness_token"]
+            entries.append(entry)
         resp = self._c._request(
             "POST",
             f"/collections/{collection_id}/faces/batch",
@@ -321,17 +356,21 @@ class FacesResource:
         or ``failed``.
 
         Each item must have ``image`` (ImageInput) and ``external_id`` (str).
-        Optional ``metadata`` dict is also supported.
+        Optional ``metadata`` dict and ``liveness_token`` (str, from
+        :meth:`active_liveness`) are also supported.
         """
         files: dict[str, Any] = {}
         entries = []
         for i, item in enumerate(items):
             fname, fbytes, ftype = _to_bytes_tuple(item["image"])
             files[f"images[{i}]"] = (fname, fbytes, ftype)
-            entries.append({
+            entry: dict[str, Any] = {
                 "externalId": item["external_id"],
                 "metadata": item.get("metadata", {}),
-            })
+            }
+            if item.get("liveness_token"):
+                entry["livenessToken"] = item["liveness_token"]
+            entries.append(entry)
         resp = self._c._request(
             "POST",
             f"/collections/{collection_id}/faces/batch-async",
