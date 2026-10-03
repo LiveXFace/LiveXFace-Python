@@ -15,6 +15,8 @@ Official Python SDK for [LiveXFace](https://github.com/livexface/livexface-pytho
 pip install livexface
 ```
 
+Validated against API contract 1.0.0 (`/openapi.json` `info.version`). The test suite calls every client method against the contract committed in `contract/` and fails if a method, path or required field is not in it; to move to a new contract, copy the release asset `openapi-<version>.json` into `contract/`, then update `CONTRACT_VERSION` and `livexface.CONTRACT_VERSION`.
+
 ## Quick Start
 
 ```python

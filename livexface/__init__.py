@@ -19,7 +19,10 @@ from .types import (
 )
 
 __version__ = "0.1.0"
+# The API contract (`info.version` of /openapi.json) this release is validated against.
+CONTRACT_VERSION = "1.0.0"
 __all__ = [
+    "CONTRACT_VERSION",
     "LiveXFace",
     "new_idempotency_key",
     "LiveXFaceApiError",
