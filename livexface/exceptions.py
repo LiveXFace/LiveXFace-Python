@@ -13,6 +13,7 @@ class LiveXFaceApiError(Exception):
         status_code: int,
         request_id: str | None = None,
         details: dict[str, Any] | None = None,
+        retry_after: int | None = None,
     ) -> None:
         super().__init__(message)
         self.code = code
@@ -21,6 +22,9 @@ class LiveXFaceApiError(Exception):
         # Machine-readable context when the API sends it, e.g. faceCount and
         # faces for MULTIPLE_FACES.
         self.details = details
+        # Seconds from the response's Retry-After header (429, 503), or None
+        # when it had none.
+        self.retry_after = retry_after
 
     def __repr__(self) -> str:
         return f"LiveXFaceApiError(code={self.code!r}, status_code={self.status_code}, message={str(self)!r})"

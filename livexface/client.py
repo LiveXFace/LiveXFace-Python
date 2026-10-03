@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import builtins
 import json
+import random
+import time
+import uuid
 from pathlib import Path
-from typing import Any, IO, Sequence, Union
+from typing import Any, Callable, IO, Sequence, Union
 
 import requests
 from requests import Response
@@ -25,8 +28,24 @@ from .types import (
 
 DEFAULT_BASE_URL = "http://localhost:8080/api/v1"
 DEFAULT_TIMEOUT = 30
+DEFAULT_MAX_RETRY_DELAY = 60.0
 
 ImageInput = Union[bytes, str, Path, IO[bytes]]
+
+# Repeating these is harmless, so a network error or a 5xx may be retried.
+_SAFE_METHODS = frozenset({"GET", "PATCH", "DELETE"})
+
+
+def new_idempotency_key() -> str:
+    """Return a random key (UUID v4) for the ``idempotency_key`` argument."""
+    return str(uuid.uuid4())
+
+
+def _retry_after(resp: Response) -> int | None:
+    value = resp.headers.get("Retry-After")
+    if isinstance(value, str) and value.strip().isdecimal():
+        return int(value)
+    return None
 
 
 def _to_bytes_tuple(src: ImageInput, filename: str = "image.jpg") -> tuple[str, bytes, str]:
@@ -70,16 +89,57 @@ class LiveXFace:
         api_key: str,
         base_url: str = DEFAULT_BASE_URL,
         timeout: int = DEFAULT_TIMEOUT,
+        max_retries: int = 0,
+        max_retry_delay: float = DEFAULT_MAX_RETRY_DELAY,
+        sleep: Callable[[float], None] = time.sleep,
     ) -> None:
+        """
+        :param max_retries: Retries after the first attempt; 0 (the default)
+            turns retries off. A 429 or 503 is retried after its
+            ``Retry-After`` (or an exponential backoff with jitter); a network
+            error or another 5xx only for GET, PATCH and DELETE calls and for
+            calls that carry an idempotency key. Other 4xx are never retried.
+        :param max_retry_delay: Upper bound, in seconds, of one wait between
+            attempts.
+        :param sleep: Called with the delay before each retry; tests replace it.
+        """
         self.api_key = api_key
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
+        self.max_retries = max_retries
+        self.max_retry_delay = max_retry_delay
+        self._sleep = sleep
         self._session = requests.Session()
         self._session.headers.update({"X-API-Key": api_key})
 
         self.faces = FacesResource(self)
 
-    def _request(self, method: str, endpoint: str, **kwargs: Any) -> Any:
+    def _request(
+        self, method: str, endpoint: str, idempotency_key: str | None = None, **kwargs: Any
+    ) -> Any:
+        if idempotency_key:
+            kwargs["headers"] = {"Idempotency-Key": idempotency_key}
+        # A keyed request is safe to repeat: the API replays the first answer.
+        safe = method in _SAFE_METHODS or bool(idempotency_key)
+        attempt = 0
+        while True:
+            try:
+                return self._send(method, endpoint, **kwargs)
+            except LiveXFaceApiError as exc:
+                retryable = exc.status_code in (429, 503) or (exc.status_code >= 500 and safe)
+                if not retryable or attempt >= self.max_retries:
+                    raise
+                wait: float | None = exc.retry_after
+            except LiveXFaceNetworkError:
+                if not safe or attempt >= self.max_retries:
+                    raise
+                wait = None
+            if wait is None:
+                wait = random.uniform(0, 0.5 * 2**attempt)
+            self._sleep(min(wait, self.max_retry_delay))
+            attempt += 1
+
+    def _send(self, method: str, endpoint: str, **kwargs: Any) -> Any:
         url = f"{self.base_url}{endpoint}"
         try:
             resp: Response = self._session.request(
@@ -102,7 +162,10 @@ class LiveXFace:
             # envelope; report the HTTP status rather than a parse failure.
             if not resp.ok:
                 raise LiveXFaceApiError(
-                    f"HTTP_{resp.status_code}", f"Request failed with HTTP {resp.status_code}", resp.status_code
+                    f"HTTP_{resp.status_code}",
+                    f"Request failed with HTTP {resp.status_code}",
+                    resp.status_code,
+                    retry_after=_retry_after(resp),
                 ) from exc
             raise LiveXFaceApiError("PARSE_ERROR", "Failed to parse response body", resp.status_code) from exc
 
@@ -114,6 +177,7 @@ class LiveXFace:
                 status_code=resp.status_code,
                 request_id=parsed.get("requestId"),
                 details=err.get("details"),
+                retry_after=_retry_after(resp),
             )
 
         return parsed.get("data")
@@ -125,6 +189,13 @@ class FacesResource:
     def __init__(self, client: LiveXFace) -> None:
         self._c = client
 
+    def _key(self, idempotency_key: str | None) -> str | None:
+        # With retries on, every attempt of one call must carry the same key,
+        # so a call without one gets its own.
+        if idempotency_key is None and self._c.max_retries > 0:
+            return new_idempotency_key()
+        return idempotency_key
+
     def register(
         self,
         collection_id: str,
@@ -132,12 +203,16 @@ class FacesResource:
         external_id: str,
         metadata: dict[str, Any] | None = None,
         liveness_token: str | None = None,
+        idempotency_key: str | None = None,
     ) -> Face:
         """Register a face in a collection.
 
         :param liveness_token: Token from a passed :meth:`active_liveness`
             check. Required when the collection requires liveness on enrolment;
             single-use, valid for 5 minutes, and bound to the collection.
+        :param idempotency_key: Sent as ``Idempotency-Key``; repeating the call
+            with the same key within 24 hours replays the first answer instead
+            of enrolling again. See :func:`new_idempotency_key`.
         """
         fname, fbytes, ftype = _to_bytes_tuple(image)
         files = {"image": (fname, fbytes, ftype)}
@@ -146,7 +221,13 @@ class FacesResource:
             data["metadata"] = json.dumps(metadata)
         if liveness_token:
             data["liveness_token"] = liveness_token
-        resp = self._c._request("POST", f"/collections/{collection_id}/faces", files=files, data=data)
+        resp = self._c._request(
+            "POST",
+            f"/collections/{collection_id}/faces",
+            idempotency_key=self._key(idempotency_key),
+            files=files,
+            data=data,
+        )
         return Face.from_dict(resp)
 
     def list(
@@ -293,13 +374,15 @@ class FacesResource:
         self,
         collection_id: str,
         items: builtins.list[dict[str, Any]],
+        idempotency_key: str | None = None,
     ) -> BatchResponse:
         """
         Batch register up to 20 faces in a single request.
 
         Each item must have ``image`` (ImageInput) and ``external_id`` (str).
         Optional ``metadata`` dict and ``liveness_token`` (str, from
-        :meth:`active_liveness`) are also supported.
+        :meth:`active_liveness`) are also supported. ``idempotency_key`` works
+        as in :meth:`register`.
 
         Example::
 
@@ -323,6 +406,7 @@ class FacesResource:
         resp = self._c._request(
             "POST",
             f"/collections/{collection_id}/faces/batch",
+            idempotency_key=self._key(idempotency_key),
             files=files,
             data={"entries": json.dumps(entries)},
         )
@@ -351,6 +435,7 @@ class FacesResource:
         self,
         collection_id: str,
         items: builtins.list[dict[str, Any]],
+        idempotency_key: str | None = None,
     ) -> BatchJob:
         """
         Submit up to 100 faces for asynchronous registration. Returns a job
@@ -359,7 +444,8 @@ class FacesResource:
 
         Each item must have ``image`` (ImageInput) and ``external_id`` (str).
         Optional ``metadata`` dict and ``liveness_token`` (str, from
-        :meth:`active_liveness`) are also supported.
+        :meth:`active_liveness`) are also supported. ``idempotency_key`` works
+        as in :meth:`register`.
         """
         files: dict[str, Any] = {}
         entries: builtins.list[dict[str, Any]] = []
@@ -376,6 +462,7 @@ class FacesResource:
         resp = self._c._request(
             "POST",
             f"/collections/{collection_id}/faces/batch-async",
+            idempotency_key=self._key(idempotency_key),
             files=files,
             data={"entries": json.dumps(entries)},
         )
