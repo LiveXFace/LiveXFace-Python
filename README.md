@@ -119,6 +119,47 @@ except LiveXFaceNetworkError as e:
     print(f"Network error: {e}")
 ```
 
+`LiveXFaceApiError` carries `status_code`, `code`, the message (`str(e)`),
+`request_id`, `details` (a dict, or `None`) and `retry_after`: the seconds from
+the response's `Retry-After` header on a 429 or 503, or `None` when it had none.
+
+## Idempotent Requests
+
+`register`, `batch_register` and `batch_register_async` accept an
+`idempotency_key`, sent as the `Idempotency-Key` header. The API remembers the
+answer to a keyed request for 24 hours: sending the same request with the same
+key again returns that stored answer, with the header `Idempotent-Replayed: true`,
+instead of enrolling the faces a second time. So a call that timed out or lost
+its connection can be repeated without creating duplicates.
+
+- The same key with a different request is answered 422 `IDEMPOTENCY_KEY_MISMATCH`.
+- The same key while the first request is still running is answered 409 `IDEMPOTENCY_KEY_IN_USE`.
+- 429 and 5xx answers are not remembered, so a retry with the same key runs the request again.
+- Other 4xx answers are remembered: after fixing the request, send it with a new key.
+
+`new_idempotency_key()` returns a random key (a UUID v4).
+
+## Production Retries
+
+Retries are off by default. `max_retries` turns them on (the number of attempts
+after the first): a 429 or 503 is retried after its `Retry-After`, capped at
+`max_retry_delay`, or after an exponential backoff with jitter when it gives
+none. A network error or another 5xx is retried only for reads, deletions and
+calls that carry an idempotency key; other 4xx are never retried. Enrolment and
+batch calls send one key on every attempt, generating it when you give none.
+
+```python
+from livexface import LiveXFace, LiveXFaceApiError, new_idempotency_key
+
+client = LiveXFace(api_key="lxf_live_xxxx", max_retries=3)
+
+key = new_idempotency_key()  # store it with your record to retry safely later
+try:
+    face = client.faces.register("collection-uuid", open("alice.jpg", "rb"), "user_123", idempotency_key=key)
+except LiveXFaceApiError as e:
+    print(f"[{e.code}] {e.status_code}: {e} (request {e.request_id}, retry after {e.retry_after}s)")
+```
+
 ## Image Input Types
 
 The SDK accepts images as:
@@ -133,3 +174,5 @@ The SDK accepts images as:
 | `api_key`  | **required**                   | Your API key (`lxf_live_xxx`)     |
 | `base_url` | `http://localhost:8080/api/v1` | Base URL of the LiveXFace server |
 | `timeout`  | `30`                           | Request timeout in seconds       |
+| `max_retries` | `0`                         | Retries after the first attempt; 0 turns retries off |
+| `max_retry_delay` | `60`                    | Longest wait between attempts, in seconds |
