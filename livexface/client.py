@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import builtins
 import json
 from pathlib import Path
 from typing import Any, IO, Sequence, Union
@@ -291,7 +292,7 @@ class FacesResource:
     def batch_register(
         self,
         collection_id: str,
-        items: list[dict[str, Any]],
+        items: builtins.list[dict[str, Any]],
     ) -> BatchResponse:
         """
         Batch register up to 20 faces in a single request.
@@ -308,7 +309,7 @@ class FacesResource:
             ])
         """
         files: dict[str, Any] = {}
-        entries = []
+        entries: builtins.list[dict[str, Any]] = []
         for i, item in enumerate(items):
             fname, fbytes, ftype = _to_bytes_tuple(item["image"])
             files[f"images[{i}]"] = (fname, fbytes, ftype)
@@ -327,7 +328,7 @@ class FacesResource:
         )
         return BatchResponse.from_dict(resp)
 
-    def batch_delete(self, collection_id: str, face_ids: list[str]) -> BatchDeleteResponse:
+    def batch_delete(self, collection_id: str, face_ids: builtins.list[str]) -> BatchDeleteResponse:
         """Batch delete up to 100 faces by their IDs."""
         resp = self._c._request(
             "DELETE",
@@ -349,7 +350,7 @@ class FacesResource:
     def batch_register_async(
         self,
         collection_id: str,
-        items: list[dict[str, Any]],
+        items: builtins.list[dict[str, Any]],
     ) -> BatchJob:
         """
         Submit up to 100 faces for asynchronous registration. Returns a job
@@ -361,7 +362,7 @@ class FacesResource:
         :meth:`active_liveness`) are also supported.
         """
         files: dict[str, Any] = {}
-        entries = []
+        entries: builtins.list[dict[str, Any]] = []
         for i, item in enumerate(items):
             fname, fbytes, ftype = _to_bytes_tuple(item["image"])
             files[f"images[{i}]"] = (fname, fbytes, ftype)
