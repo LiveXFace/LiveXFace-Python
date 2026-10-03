@@ -112,6 +112,7 @@ class LiveXFace:
                 message=err.get("message", "An unknown error occurred"),
                 status_code=resp.status_code,
                 request_id=parsed.get("requestId"),
+                details=err.get("details"),
             )
 
         return parsed.get("data")
