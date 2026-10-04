@@ -52,6 +52,12 @@ CALLS: dict[str, tuple[tuple[Any, ...], dict[str, Any], Any]] = {
     "faces.identify": (("c1", IMG), {"top_k": 3, "threshold": 0.5}, DATA),
     "faces.liveness": (("c1", IMG), {}, DATA),
     "faces.active_liveness": (("c1", [IMG] * 5), {}, DATA),
+    "faces.create_liveness_session": (
+        ("c1",),
+        {},
+        {"sessionId": "lvs_1", "challenges": [{"type": "blink"}], "expiresAt": "2026-09-28T00:01:00Z"},
+    ),
+    "faces.complete_liveness_session": (("c1", "lvs_1", [IMG] * 5), {"mirrored": True}, DATA),
     "faces.compare": ((IMG, IMG), {"threshold": 0.5}, DATA),
     "faces.batch_register": (("c1", ITEMS), {"idempotency_key": "key-2"}, DATA),
     "faces.batch_delete": (("c1", ["f1", "f2"]), {}, DATA),
