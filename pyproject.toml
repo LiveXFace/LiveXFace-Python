@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "livexface"
-version = "0.1.0"
+version = "1.0.0"
 description = "Official Python SDK for LiveXFace — Face Recognition as a Service"
 readme = "README.md"
 requires-python = ">=3.10"

@@ -168,6 +168,44 @@ def test_unkeyed_post_is_not_retried_on_network_error_or_500(api: FakeAPI, first
     assert len(api.requests) == 1
 
 
+@pytest.mark.parametrize("first", [DROP, _err(500, "INTERNAL_ERROR"), _err(503, "SERVICE_BUSY")])
+def test_liveness_session_completion_is_not_retried(api: FakeAPI, first: Any) -> None:
+    # The session is used up once the request reaches the API; a retry would
+    # only get LIVENESS_SESSION_INVALID and hide the real failure.
+    api.replies = [first, _ok(200, {"isLive": True})]
+
+    with pytest.raises((LiveXFaceNetworkError, LiveXFaceApiError)):
+        _client(api, [], max_retries=3).faces.complete_liveness_session("c1", "lvs_1", [b"img"] * 5)
+
+    assert len(api.requests) == 1
+    assert api.keys() == [None]
+
+
+def test_busy_liveness_session_completion_surfaces_the_503(api: FakeAPI) -> None:
+    api.replies = [_err(503, "SERVICE_BUSY", {"Retry-After": "1"}), _ok(200, {"isLive": True})]
+    sleeps: list[float] = []
+
+    with pytest.raises(LiveXFaceApiError) as exc:
+        _client(api, sleeps, max_retries=3).faces.complete_liveness_session("c1", "lvs_1", [b"img"] * 5)
+
+    assert exc.value.status_code == 503
+    assert exc.value.code == "SERVICE_BUSY"
+    assert len(api.requests) == 1
+    assert sleeps == []
+
+
+def test_liveness_session_completion_is_retried_on_429(api: FakeAPI) -> None:
+    # A 429 is rejected before the session is touched.
+    api.replies = [_err(429, "RATE_LIMIT_EXCEEDED", {"Retry-After": "1"}), _ok(200, {"isLive": True})]
+    sleeps: list[float] = []
+
+    result = _client(api, sleeps, max_retries=1).faces.complete_liveness_session("c1", "lvs_1", [b"img"] * 5)
+
+    assert result.is_live is True
+    assert len(api.requests) == 2
+    assert sleeps == [1]
+
+
 def test_unkeyed_post_is_retried_on_503(api: FakeAPI) -> None:
     api.replies = [_err(503, "SERVICE_BUSY"), _ok(200, {"matches": []})]
     sleeps: list[float] = []

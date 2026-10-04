@@ -20,6 +20,8 @@ from .types import (
     IdentifyResult,
     LivenessResult,
     ActiveLivenessResult,
+    LivenessSession,
+    LivenessSessionResult,
     BatchResponse,
     BatchDeleteResponse,
     AttributesResult,
@@ -61,6 +63,10 @@ def _to_bytes_tuple(src: ImageInput, filename: str = "image.jpg") -> tuple[str, 
     return filename, src.read(), "image/jpeg"
 
 
+def _frame_files(frames: Sequence[ImageInput]) -> dict[str, Any]:
+    return {f"frame_{i}": _to_bytes_tuple(frame, f"frame_{i}.jpg") for i, frame in enumerate(frames)}
+
+
 class LiveXFace:
     """
     Main client for the LiveXFace recognition API.
@@ -99,6 +105,8 @@ class LiveXFace:
             ``Retry-After`` (or an exponential backoff with jitter); a network
             error or another 5xx only for GET, PATCH and DELETE calls and for
             calls that carry an idempotency key. Other 4xx are never retried.
+            :meth:`FacesResource.complete_liveness_session` is retried on a
+            429 only: a session is judged once.
         :param max_retry_delay: Upper bound, in seconds, of one wait between
             attempts.
         :param sleep: Called with the delay before each retry; tests replace it.
@@ -115,18 +123,27 @@ class LiveXFace:
         self.faces = FacesResource(self)
 
     def _request(
-        self, method: str, endpoint: str, idempotency_key: str | None = None, **kwargs: Any
+        self,
+        method: str,
+        endpoint: str,
+        idempotency_key: str | None = None,
+        single_use: bool = False,
+        **kwargs: Any,
     ) -> Any:
+        """:param single_use: The request uses up a server-side resource once it
+        reaches the handler, whatever the outcome (a liveness session), so only
+        a 429, which is rejected before that, is retried."""
         if idempotency_key:
             kwargs["headers"] = {"Idempotency-Key": idempotency_key}
         # A keyed request is safe to repeat: the API replays the first answer.
         safe = method in _SAFE_METHODS or bool(idempotency_key)
+        busy = (429,) if single_use else (429, 503)
         attempt = 0
         while True:
             try:
                 return self._send(method, endpoint, **kwargs)
             except LiveXFaceApiError as exc:
-                retryable = exc.status_code in (429, 503) or (exc.status_code >= 500 and safe)
+                retryable = exc.status_code in busy or (exc.status_code >= 500 and safe)
                 if not retryable or attempt >= self.max_retries:
                     raise
                 wait: float | None = exc.retry_after
@@ -207,8 +224,8 @@ class FacesResource:
     ) -> Face:
         """Register a face in a collection.
 
-        :param liveness_token: Token from a passed :meth:`active_liveness`
-            check. Required when the collection requires liveness on enrolment;
+        :param liveness_token: Token from a passed liveness session (see
+            :meth:`complete_liveness_session`). Required when the collection requires liveness on enrolment;
             single-use, valid for 5 minutes, and bound to the collection.
         :param idempotency_key: Sent as ``Idempotency-Key``; repeating the call
             with the same key within 24 hours replays the first answer instead
@@ -338,18 +355,57 @@ class FacesResource:
         Active liveness — check a sequence of frames for a blink, a head turn
         and passive anti-spoofing.
 
-        Send 5 to 50 frames (JPEG/PNG) captured in order. When the check
-        passes, the result carries a ``liveness_token`` to pass to
-        :meth:`register` or a batch entry: single-use, valid for 5 minutes,
-        and bound to this collection.
+        Send 5 to 50 frames (JPEG/PNG) captured in order. This stateless check
+        returns a verdict only and issues no liveness token; to enrol into a
+        collection that requires liveness, use :meth:`create_liveness_session`
+        and :meth:`complete_liveness_session`.
         """
-        files: dict[str, Any] = {}
-        for i, frame in enumerate(frames):
-            files[f"frame_{i}"] = _to_bytes_tuple(frame, f"frame_{i}.jpg")
         resp = self._c._request(
-            "POST", f"/collections/{collection_id}/active-liveness", files=files
+            "POST", f"/collections/{collection_id}/active-liveness", files=_frame_files(frames)
         )
         return ActiveLivenessResult.from_dict(resp)
+
+    def create_liveness_session(self, collection_id: str) -> LivenessSession:
+        """
+        Start a liveness session bound to this collection. The server picks the
+        steps the person must perform, in order (``blink``, ``turn_left``,
+        ``turn_right``; the person's own left and right). Show them, capture
+        frames while they are performed, and submit the frames with
+        :meth:`complete_liveness_session` before ``expires_at``.
+        """
+        resp = self._c._request("POST", f"/collections/{collection_id}/liveness-sessions")
+        return LivenessSession.from_dict(resp)
+
+    def complete_liveness_session(
+        self,
+        collection_id: str,
+        session_id: str,
+        frames: Sequence[ImageInput],
+        mirrored: bool = False,
+    ) -> LivenessSessionResult:
+        """
+        Submit 5 to 50 frames (JPEG/PNG), captured in order, for a liveness
+        session. A session is judged once: any submission except one with
+        fewer than 5 frames uses it up, so this call is never retried on a
+        network error or a 5xx. When the session passes, the result carries a
+        ``liveness_token`` to pass to :meth:`register` or a batch entry:
+        single-use, valid for 5 minutes, and bound to this collection.
+
+        :param mirrored: True when the frames are horizontally mirrored, as a
+            selfie preview is.
+
+        Raises :class:`LiveXFaceApiError` with code ``LIVENESS_SESSION_INVALID``
+        (422) when the session is unknown, expired, already submitted or bound
+        to another collection; create a new session then.
+        """
+        resp = self._c._request(
+            "POST",
+            f"/collections/{collection_id}/liveness-sessions/{session_id}",
+            single_use=True,
+            files=_frame_files(frames),
+            data={"mirrored": "true" if mirrored else "false"},
+        )
+        return LivenessSessionResult.from_dict(resp)
 
     def compare(
         self,
@@ -381,7 +437,7 @@ class FacesResource:
 
         Each item must have ``image`` (ImageInput) and ``external_id`` (str).
         Optional ``metadata`` dict and ``liveness_token`` (str, from
-        :meth:`active_liveness`) are also supported. ``idempotency_key`` works
+        :meth:`complete_liveness_session`) are also supported. ``idempotency_key`` works
         as in :meth:`register`.
 
         Example::
@@ -444,7 +500,7 @@ class FacesResource:
 
         Each item must have ``image`` (ImageInput) and ``external_id`` (str).
         Optional ``metadata`` dict and ``liveness_token`` (str, from
-        :meth:`active_liveness`) are also supported. ``idempotency_key`` works
+        :meth:`complete_liveness_session`) are also supported. ``idempotency_key`` works
         as in :meth:`register`.
         """
         files: dict[str, Any] = {}

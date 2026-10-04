@@ -15,7 +15,7 @@ Official Python SDK for [LiveXFace](https://github.com/livexface/livexface-pytho
 pip install livexface
 ```
 
-Validated against API contract 1.0.0 (`/openapi.json` `info.version`). The test suite calls every client method against the contract committed in `contract/` and fails if a method, path or required field is not in it; to move to a new contract, copy the release asset `openapi-<version>.json` into `contract/`, then update `CONTRACT_VERSION` and `livexface.CONTRACT_VERSION`.
+Validated against API contract 2.0.0 (`/openapi.json` `info.version`). The test suite calls every client method against the contract committed in `contract/` and fails if a method, path or required field is not in it; to move to a new contract, copy the release asset `openapi-<version>.json` into `contract/`, then update `CONTRACT_VERSION` and `livexface.CONTRACT_VERSION`.
 
 ## Quick Start
 
@@ -61,26 +61,52 @@ liveness = client.faces.liveness(
 print(f"Live: {liveness.is_live}, Score: {liveness.liveness_score:.3f}")
 ```
 
-## Active Liveness and Enrolment
+## Liveness Sessions and Enrolment
 
-A collection can require a liveness check before a face is enrolled. Run an
-active check over 5 to 50 frames captured in order (the user blinks and turns
-their head), then pass the token it returns when you register. The token is
-single-use, valid for 5 minutes, and bound to the collection.
+A collection can require a liveness check before a face is enrolled. The
+token for that comes from a liveness session: the server picks the steps the
+person must perform, in order, and the frames must show them.
+
+1. Create a session. `challenges` lists the steps: `blink`, `turn_left` or
+   `turn_right` (the person's own left and right). Submit before `expires_at`
+   (60 seconds by default).
+2. Show each prompt and capture 5 to 50 frames, in order, while the person
+   performs them.
+3. Complete the session with the frames. Pass `mirrored=True` when they are
+   horizontally mirrored, as a selfie preview is.
+4. If it passed, register with its `liveness_token`: single-use, valid for 5
+   minutes, and bound to the collection.
 
 ```python
-frames = [open(f"frame_{i}.jpg", "rb") for i in range(10)]
-check = client.faces.active_liveness("collection-uuid", frames)
-print(f"Live: {check.is_live}, Blink: {check.blink.passed}, Head turn: {check.head_turn.passed}")
+session = client.faces.create_liveness_session("collection-uuid")
+prompts = {"blink": "Blink", "turn_left": "Turn your head to your left", "turn_right": "Turn your head to your right"}
+for step in session.challenges:
+    print(prompts[step])  # show the prompt, keep capturing frames
 
-if check.liveness_token:
+frames = [open(f"frame_{i}.jpg", "rb") for i in range(25)]
+result = client.faces.complete_liveness_session("collection-uuid", session.session_id, frames, mirrored=True)
+print(f"Live: {result.is_live}, Steps: {[(s.type, s.passed) for s in result.steps]}")
+
+if result.liveness_token:
     face = client.faces.register(
         collection_id="collection-uuid",
         image=open("photo.jpg", "rb"),
         external_id="user_123",
-        liveness_token=check.liveness_token,
+        liveness_token=result.liveness_token,
     )
 ```
+
+A session is judged once. Any submission except one with fewer than 5 frames
+(400 `IMAGE_REQUIRED`, the session is kept) uses it up, so
+`complete_liveness_session` is never retried on a network error or a 5xx;
+create a new session instead. Completing fails with `LIVENESS_SESSION_INVALID`
+(422) when the session is unknown, expired, already submitted or bound to
+another collection, and with `SERVICE_BUSY` (503) when the engine is
+saturated; create a new session for either.
+
+`active_liveness(collection_id, frames)` still checks frames for a blink, a
+head turn and passive anti-spoofing, but it returns a verdict only and no
+token.
 
 Batch items accept a `liveness_token` key too. Enrolment fails with
 `LIVENESS_TOKEN_REQUIRED` (400) when the collection requires a token and none
@@ -149,6 +175,8 @@ after the first): a 429 or 503 is retried after its `Retry-After`, capped at
 none. A network error or another 5xx is retried only for reads, deletions and
 calls that carry an idempotency key; other 4xx are never retried. Enrolment and
 batch calls send one key on every attempt, generating it when you give none.
+`complete_liveness_session` is retried on a 429 only, since a session is
+judged once.
 
 ```python
 from livexface import LiveXFace, LiveXFaceApiError, new_idempotency_key

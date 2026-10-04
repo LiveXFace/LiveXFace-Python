@@ -10,6 +10,9 @@ from .types import (
     LivenessResult,
     LivenessChallenge,
     ActiveLivenessResult,
+    LivenessSession,
+    LivenessStep,
+    LivenessSessionResult,
     BatchResponse,
     BatchDeleteResponse,
     FaceAttributes,
@@ -18,9 +21,9 @@ from .types import (
     BatchJob,
 )
 
-__version__ = "0.1.0"
+__version__ = "1.0.0"
 # The API contract (`info.version` of /openapi.json) this release is validated against.
-CONTRACT_VERSION = "1.0.0"
+CONTRACT_VERSION = "2.0.0"
 __all__ = [
     "CONTRACT_VERSION",
     "LiveXFace",
@@ -34,6 +37,9 @@ __all__ = [
     "LivenessResult",
     "LivenessChallenge",
     "ActiveLivenessResult",
+    "LivenessSession",
+    "LivenessStep",
+    "LivenessSessionResult",
     "BatchResponse",
     "BatchDeleteResponse",
     "FaceAttributes",

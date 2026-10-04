@@ -134,10 +134,10 @@ class LivenessChallenge:
 
 @dataclass
 class ActiveLivenessResult:
-    """Result of an active (multi-frame) liveness check.
+    """Result of a stateless active (multi-frame) liveness check.
 
-    ``liveness_token`` and ``liveness_token_expires_at`` (RFC 3339) are set only
-    when the check passed.
+    A verdict only: it carries no liveness token. To enrol into a collection
+    that requires liveness, complete a liveness session instead.
     """
 
     is_live: bool
@@ -147,8 +147,6 @@ class ActiveLivenessResult:
     blink: LivenessChallenge
     head_turn: LivenessChallenge
     passive_antispoof: LivenessChallenge
-    liveness_token: str | None = None
-    liveness_token_expires_at: str | None = None
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "ActiveLivenessResult":
@@ -161,6 +159,62 @@ class ActiveLivenessResult:
             blink=LivenessChallenge.from_dict(ch.get("blink") or {}),
             head_turn=LivenessChallenge.from_dict(ch.get("headTurn") or {}),
             passive_antispoof=LivenessChallenge.from_dict(ch.get("passiveAntispoof") or {}),
+        )
+
+
+@dataclass
+class LivenessSession:
+    """A liveness session: the steps the person must perform, in order.
+
+    Each entry of ``challenges`` is ``blink``, ``turn_left`` or ``turn_right``
+    (the person's own left and right). Submit the frames with
+    :meth:`~livexface.client.FacesResource.complete_liveness_session` before
+    ``expires_at`` (RFC 3339).
+    """
+
+    session_id: str
+    challenges: list[str]
+    expires_at: str
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> "LivenessSession":
+        return cls(
+            session_id=d["sessionId"],
+            challenges=[c.get("type", "") for c in d.get("challenges") or []],
+            expires_at=d.get("expiresAt", ""),
+        )
+
+
+@dataclass
+class LivenessStep:
+    """One step of a completed liveness session and whether it was performed."""
+
+    type: str
+    passed: bool
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> "LivenessStep":
+        return cls(type=d.get("type", ""), passed=bool(d.get("passed", False)))
+
+
+@dataclass
+class LivenessSessionResult(ActiveLivenessResult):
+    """Result of completing a liveness session: the active check's fields plus
+    ``steps``, the session's challenges in order.
+
+    ``liveness_token`` and ``liveness_token_expires_at`` (RFC 3339) are set only
+    when the session passed.
+    """
+
+    steps: list[LivenessStep] = field(default_factory=list)
+    liveness_token: str | None = None
+    liveness_token_expires_at: str | None = None
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> "LivenessSessionResult":
+        return cls(
+            **vars(ActiveLivenessResult.from_dict(d)),
+            steps=[LivenessStep.from_dict(s) for s in d.get("steps") or []],
             liveness_token=d.get("livenessToken") or None,
             liveness_token_expires_at=d.get("livenessTokenExpiresAt") or None,
         )
