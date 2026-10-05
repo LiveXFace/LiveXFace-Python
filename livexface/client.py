@@ -18,6 +18,7 @@ from .types import (
     Face,
     VerifyResult,
     IdentifyResult,
+    CrossCollectionSearchResult,
     LivenessResult,
     ActiveLivenessResult,
     LivenessSession,
@@ -336,6 +337,24 @@ class FacesResource:
             "POST", f"/collections/{collection_id}/identify", files=files, data=data
         )
         return IdentifyResult.from_dict(resp)
+
+    def search(
+        self,
+        image: ImageInput,
+        collection_ids: Sequence[str] | None = None,
+        top_k: int = 5,
+        threshold: float | None = None,
+    ) -> CrossCollectionSearchResult:
+        """Search for matching faces across multiple or all collections."""
+        fname, fbytes, ftype = _to_bytes_tuple(image)
+        files = {"image": (fname, fbytes, ftype)}
+        data: dict[str, str] = {"top_k": str(top_k)}
+        if collection_ids:
+            data["collection_ids"] = ",".join(collection_ids)
+        if threshold is not None:
+            data["threshold"] = str(threshold)
+        resp = self._c._request("POST", "/search", files=files, data=data)
+        return CrossCollectionSearchResult.from_dict(resp)
 
     def liveness(self, collection_id: str, image: ImageInput) -> LivenessResult:
         """Passive liveness detection — check whether the face in the image is live."""
