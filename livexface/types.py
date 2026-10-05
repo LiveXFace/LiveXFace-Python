@@ -85,6 +85,55 @@ class IdentifyResult:
 
 
 @dataclass
+class CrossCollectionSearchMatch(FaceMatch):
+    collection_id: str = ""
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> "CrossCollectionSearchMatch":
+        return cls(
+            face_id=d.get("faceId", ""),
+            external_id=d.get("externalId", ""),
+            confidence=float(d.get("confidence", 0.0)),
+            metadata=d.get("metadata"),
+            collection_id=d.get("collectionId", ""),
+        )
+
+
+@dataclass
+class SkippedCollection:
+    id: str
+    name: str
+    reason: str
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> "SkippedCollection":
+        return cls(
+            id=d.get("id", ""),
+            name=d.get("name", ""),
+            reason=d.get("reason", ""),
+        )
+
+
+@dataclass
+class CrossCollectionSearchResult:
+    matches: list[CrossCollectionSearchMatch]
+    query_time_ms: int
+    collections_searched: int
+    skipped_collections: list[SkippedCollection]
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> "CrossCollectionSearchResult":
+        return cls(
+            matches=[CrossCollectionSearchMatch.from_dict(m) for m in d.get("matches", [])],
+            query_time_ms=d.get("queryTimeMs", 0),
+            collections_searched=d.get("collectionsSearched", 0),
+            skipped_collections=[
+                SkippedCollection.from_dict(c) for c in d.get("skippedCollections", [])
+            ],
+        )
+
+
+@dataclass
 class LivenessResult:
     """Result of a passive liveness check.
 

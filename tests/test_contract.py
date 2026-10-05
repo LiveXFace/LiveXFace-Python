@@ -50,6 +50,7 @@ CALLS: dict[str, tuple[tuple[Any, ...], dict[str, Any], Any]] = {
     "faces.delete": (("c1", "f1"), {}, NO_CONTENT),
     "faces.verify": (("c1", IMG, "f1"), {"threshold": 0.5}, DATA),
     "faces.identify": (("c1", IMG), {"top_k": 3, "threshold": 0.5}, DATA),
+    "faces.search": ((IMG,), {"collection_ids": ["c1", "c2"], "top_k": 3, "threshold": 0.5}, DATA),
     "faces.liveness": (("c1", IMG), {}, DATA),
     "faces.active_liveness": (("c1", [IMG] * 5), {}, DATA),
     "faces.create_liveness_session": (
